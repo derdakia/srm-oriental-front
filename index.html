@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gestion Contrats</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      body { 
+        font-family: 'Inter', sans-serif; 
+        -webkit-font-smoothing: antialiased;
+      }
+      
+      /* Smooth fade in animation */
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.3s ease-out forwards;
+      }
+
+      /* Print Styles - Strict Isolation */
+      @media print {
+        @page { 
+            margin: 0;
+            size: auto; 
+        }
+        
+        /* Hide everything by default */
+        body * { 
+            visibility: hidden; 
+        }
+        
+        /* Stop scrolling and reset background */
+        body, html {
+            height: auto;
+            overflow: visible;
+            background: white !important;
+        }
+
+        /* Hide specific UI elements strictly */
+        nav, footer, button, .no-print, .modal-overlay { 
+            display: none !important; 
+        }
+
+        /* Show and Position the Proof Container */
+        .printable-proof, .printable-proof * {
+            visibility: visible;
+        }
+
+        .printable-proof {
+            display: block !important;
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            margin: 0;
+            padding: 2cm;
+            background: white;
+            z-index: 99999;
+        }
+      }
+      
+      .printable-proof { display: none; }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^6.22.3",
+    "react-hot-toast": "https://aistudiocdn.com/react-hot-toast@^2.6.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-gray-50 text-slate-800">
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

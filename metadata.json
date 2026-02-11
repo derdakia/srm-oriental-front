@@ -1,0 +1,4 @@
+{
+  "name": "Gestion Contrats",
+  "description": "A contract management system with Client, Technician, and Admin interfaces. Features verification flows, role-based access, and audit logging. Simulates a PHP/MySQL backend using local browser storage."
+}
