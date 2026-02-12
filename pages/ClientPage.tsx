@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { dbService } from '../services/mockDb';
+import { apiContracts } from '../services/apiContracts';
 import { User } from '../types';
 import { showToast } from '../utils/toast';
 
@@ -13,6 +14,7 @@ const ClientPage: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [otpCode, setOtpCode] = useState('');
+  const [userFromBackend, setUserFromBackend] = useState(false);
 
   const location = useLocation();
 
@@ -30,6 +32,30 @@ const ClientPage: React.FC = () => {
     setError('');
     setUser(null);
     setIsVerifying(false);
+    setUserFromBackend(false);
+
+    const backendRes = await apiContracts.getContractByNumber(id);
+    if (backendRes.success && backendRes.contract) {
+      const c = backendRes.contract;
+      setUser({
+        id: 0,
+        contract: c.n_contrat,
+        nom: c.nom || '',
+        cin: c.cin || '',
+        phone: c.n_tlf1 || null,
+        phone2: c.n_tlf2 || null,
+        phoneVerified: !!(c.verified),
+        phoneUpdateCount: 0,
+        lastVerifiedAt: null,
+        lastModifiedBy: null,
+        lastModifiedAt: null,
+        createdAt: new Date().toISOString(),
+      });
+      setPhone(c.n_tlf1 || '');
+      setUserFromBackend(true);
+      setLoading(false);
+      return;
+    }
 
     const res = await dbService.getUserByContract(id);
     if (res.success && res.data) {
@@ -56,30 +82,52 @@ const ClientPage: React.FC = () => {
         return;
     }
     setLoading(true);
-    const res = await dbService.sendVerificationCode(user.contract, phone, 'client');
-    setLoading(false);
-
-    if (res.success) {
-      setIsVerifying(true);
-      showToast(`SMS ENVOYÉ : Votre code est ${res.data}`, 'success'); 
+    if (userFromBackend) {
+      const res = await apiContracts.sendVerificationCode(user.contract, phone);
+      setLoading(false);
+      if (res.success) {
+        setIsVerifying(true);
+        showToast('Code envoyé par SMS et WhatsApp', 'success');
+      } else {
+        showToast(res.message || 'Erreur d\'envoi', 'error');
+      }
     } else {
-      showToast(res.message || 'Erreur d\'envoi', 'error');
+      const res = await dbService.sendVerificationCode(user.contract, phone, 'client');
+      setLoading(false);
+      if (res.success) {
+        setIsVerifying(true);
+        showToast(`SMS ENVOYÉ : Votre code est ${res.data}`, 'success');
+      } else {
+        showToast(res.message || 'Erreur d\'envoi', 'error');
+      }
     }
   };
 
   const handleVerify = async () => {
     if (!user) return;
     setLoading(true);
-    const res = await dbService.verifyCode(user.contract, otpCode, phone, 'client');
-    setLoading(false);
-
-    if (res.success && res.data) {
-      setUser(res.data);
-      setIsVerifying(false);
-      setOtpCode('');
-      showToast('Téléphone vérifié avec succès !', 'success');
+    if (userFromBackend) {
+      const res = await apiContracts.verifyCode(user.contract, otpCode);
+      setLoading(false);
+      if (res.success) {
+        setUser((prev) => prev ? { ...prev, phoneVerified: true } : null);
+        setIsVerifying(false);
+        setOtpCode('');
+        showToast('Téléphone vérifié avec succès !', 'success');
+      } else {
+        showToast(res.message || 'Échec de la vérification', 'error');
+      }
     } else {
-      showToast(res.message || 'Échec de la vérification', 'error');
+      const res = await dbService.verifyCode(user.contract, otpCode, phone, 'client');
+      setLoading(false);
+      if (res.success && res.data) {
+        setUser(res.data);
+        setIsVerifying(false);
+        setOtpCode('');
+        showToast('Téléphone vérifié avec succès !', 'success');
+      } else {
+        showToast(res.message || 'Échec de la vérification', 'error');
+      }
     }
   };
 
