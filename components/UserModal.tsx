@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { dbService } from '../services/mockDb';
+import { apiContracts } from '../services/apiContracts';
 import { showToast } from '../utils/toast';
 
 interface UserModalProps {
@@ -37,30 +38,86 @@ const UserModal: React.FC<UserModalProps> = ({ user: initialUser, mode, isOpen, 
   const maskPhone = (val: string = "") => val.length > 4 ? "*".repeat(val.length - 4) + val.slice(-4) : val;
 
   const handleSendOTP = async () => {
-    if (!formData.phone || formData.phone.length < 10) {
+    if (!formData.contract?.trim()) {
+      showToast("Saisissez le numéro de contrat", "error");
+      return;
+    }
+    if (!formData.phone || formData.phone.replace(/\D/g, '').length < 10) {
       showToast("Numéro invalide", "error");
       return;
     }
     setIsSending(true);
-    const res = await dbService.sendVerificationCode(formData.contract!, formData.phone, 'staff');
-    setIsSending(false);
-    if (res.success) {
-      setShowVerifyInput(true);
-      showToast(`Code envoyé`, "success");
+    try {
+      const n_contrat = formData.contract.trim();
+      const phone = formData.phone.replace(/\s/g, '');
+      if (mode === 'create') {
+        const addRes = await apiContracts.addContract({
+          agence: 'BE-OUED NACHEF',
+          n_client: n_contrat,
+          n_contrat,
+          nom: (formData.nom || '').trim() || 'Client',
+          prenom: '-',
+          cin: (formData.cin || '').trim() || '-',
+          n_tlf1: phone,
+          n_tlf2: (formData.phone2 || '').trim() || phone,
+        });
+        if (!addRes.success) {
+          const exists = await apiContracts.getContractByNumber(n_contrat);
+          if (!exists.success) {
+            showToast(addRes.message || "Erreur création contrat", "error");
+            setIsSending(false);
+            return;
+          }
+        }
+      } else {
+        const exists = await apiContracts.getContractByNumber(n_contrat);
+        if (!exists.success) {
+          const addRes = await apiContracts.addContract({
+            agence: 'BE-OUED NACHEF',
+            n_client: n_contrat,
+            n_contrat,
+            nom: (formData.nom || '').trim() || 'Client',
+            prenom: '-',
+            cin: (formData.cin || '').trim() || '-',
+            n_tlf1: phone,
+            n_tlf2: (formData.phone2 || '').trim() || phone,
+          });
+          if (!addRes.success) {
+            showToast(addRes.message || "Erreur", "error");
+            setIsSending(false);
+            return;
+          }
+        }
+      }
+      const res = await apiContracts.sendVerificationCode(n_contrat, phone);
+      if (res.success) {
+        setShowVerifyInput(true);
+        showToast("Code envoyé par SMS et WhatsApp", "success");
+      } else {
+        showToast(res.message || "Erreur envoi code", "error");
+      }
+    } catch (e) {
+      showToast("Erreur de connexion au serveur", "error");
     }
+    setIsSending(false);
   };
 
   const handleVerifyCode = async () => {
+    if (!formData.contract?.trim() || !verificationCode.trim()) {
+      showToast("Saisissez le code reçu", "error");
+      return;
+    }
     setLoading(true);
-    const res = await dbService.verifyCode(formData.contract!, verificationCode, formData.phone!, 'staff');
+    const res = await apiContracts.verifyCode(formData.contract.trim(), verificationCode.trim());
     setLoading(false);
-    if (res.success && res.data) {
-      setFormData(res.data);
+    if (res.success) {
+      setFormData((prev) => ({ ...prev, phoneVerified: true }));
       setShowVerifyInput(false);
+      setVerificationCode('');
       showToast("Vérifié avec succès !", "success");
-      if (onSave) onSave(res.data);
+      if (onSave && formData.id) onSave({ ...formData, phoneVerified: true } as User);
     } else {
-      showToast("Code erroné", "error");
+      showToast(res.message || "Code erroné", "error");
     }
   };
 
@@ -171,7 +228,13 @@ const UserModal: React.FC<UserModalProps> = ({ user: initialUser, mode, isOpen, 
                   !showVerifyInput ? (
                     <button onClick={handleSendOTP} disabled={isSending} className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">Vérifier le numéro</button>
                   ) : (
-                    <div className="flex gap-2"><input placeholder="Code" value={verificationCode} onChange={e => setVerificationCode(e.target.value)} className="flex-1 border p-2 rounded-lg text-center font-bold" /><button onClick={handleVerifyCode} className="px-4 bg-green-600 text-white rounded-lg font-bold text-xs">Confirmer</button></div>
+                    <div className="space-y-2">
+                      <p className="text-xs text-slate-600">Entrez le code de vérification reçu par SMS sur le numéro du client.</p>
+                      <div className="flex gap-2">
+                        <input placeholder="Code à 4 chiffres" value={verificationCode} onChange={e => setVerificationCode(e.target.value)} className="flex-1 border p-2 rounded-lg text-center font-bold" maxLength={4} />
+                        <button onClick={handleVerifyCode} disabled={loading || verificationCode.length < 4} className="px-4 bg-green-600 text-white rounded-lg font-bold text-xs disabled:opacity-50">Confirmer</button>
+                      </div>
+                    </div>
                   )
                 ) : <p className="text-center text-xs text-green-600 font-bold">Dossier authentifié ✅</p>}
               </div>
